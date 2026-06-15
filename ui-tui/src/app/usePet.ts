@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PetGrid } from '../components/petSprite.js'
 
 import { useGateway } from './gatewayContext.js'
+import { $petFlash } from './petFlashStore.js'
 import { $turnState } from './turnStore.js'
 import { $uiState } from './uiStore.js'
 
@@ -103,18 +104,12 @@ export function usePet(): PetRender {
 
   const [petState, setPetState] = useState<PetState>('idle')
 
-  // Recompute the desired state on every turn/ui change.
+  // Recompute the desired state on every turn/ui/flash change. A transient
+  // flash (wave/jump/failed) wins until it expires; a timer re-runs at expiry.
   useEffect(() => {
-    const recompute = () => {
-      const turn = $turnState.get()
-      const ui = $uiState.get()
+    let expiry: ReturnType<typeof setTimeout> | undefined
 
-      const next = derivePetState({
-        busy: ui.busy,
-        toolRunning: turn.tools.length > 0,
-        reasoning: turn.reasoningActive
-      })
-
+    const apply = (next: PetState) => {
       if (next !== stateRef.current) {
         stateRef.current = next
         frameRef.current = 0
@@ -122,13 +117,35 @@ export function usePet(): PetRender {
       }
     }
 
+    const recompute = () => {
+      clearTimeout(expiry)
+
+      const flash = $petFlash.get()
+      const now = Date.now()
+
+      if (flash && now < flash.until) {
+        apply(flash.state)
+        expiry = setTimeout(recompute, flash.until - now)
+
+        return
+      }
+
+      const turn = $turnState.get()
+      const ui = $uiState.get()
+
+      apply(derivePetState({ busy: ui.busy, toolRunning: turn.tools.length > 0, reasoning: turn.reasoningActive }))
+    }
+
     recompute()
     const unsubTurn = $turnState.listen(recompute)
     const unsubUi = $uiState.listen(recompute)
+    const unsubFlash = $petFlash.listen(recompute)
 
     return () => {
+      clearTimeout(expiry)
       unsubTurn()
       unsubUi()
+      unsubFlash()
     }
   }, [])
 

@@ -33,6 +33,7 @@ import { $gateway } from '@/store/gateway'
 import { dispatchNativeNotification } from '@/store/native-notifications'
 import { notify } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
+import { flashPetActivity, setPetActivity } from '@/store/pet'
 import { clearAllPrompts, setApprovalRequest, setSecretRequest, setSudoRequest } from '@/store/prompts'
 import {
   setCurrentBranch,
@@ -48,7 +49,7 @@ import {
   setYoloActive
 } from '@/store/session'
 import { clearSessionSubagents, pruneDelegateFallbackSubagents, upsertSubagent } from '@/store/subagents'
-import { setSessionTodos } from '@/store/todos'
+import { $todosBySession, setSessionTodos, todoListActive } from '@/store/todos'
 import { recordToolDiff } from '@/store/tool-diffs'
 import type { RpcEvent } from '@/types/hermes'
 
@@ -865,9 +866,17 @@ export function useMessageStream({
         if (sessionId) {
           appendReasoningDelta(sessionId, coerceThinkingText(payload?.text))
         }
+
+        if (isActiveEvent) {
+          setPetActivity({ reasoning: true })
+        }
       } else if (event.type === 'reasoning.available') {
         if (sessionId) {
           appendReasoningDelta(sessionId, coerceThinkingText(payload?.text), true)
+        }
+
+        if (isActiveEvent) {
+          setPetActivity({ reasoning: true })
         }
       } else if (event.type === 'message.complete') {
         if (!sessionId) {
@@ -890,6 +899,12 @@ export function useMessageStream({
 
         if (isActiveEvent) {
           setTurnStartedAt(null)
+
+          // Pet beat: celebrate a finished plan, else a clean-finish wave.
+          const todos = $todosBySession.get()[sessionId] ?? []
+          const done = todos.length > 0 && !todoListActive(todos)
+          setPetActivity({ reasoning: false, toolRunning: false })
+          flashPetActivity(done ? { celebrate: true } : { justCompleted: true })
         }
 
         if (payload?.usage) {
@@ -902,10 +917,19 @@ export function useMessageStream({
 
         flushQueuedDeltas(sessionId)
         upsertToolCall(sessionId, toTodoPayload(payload) ?? payload, 'running', event.type)
+
+        if (isActiveEvent) {
+          setPetActivity({ reasoning: false, toolRunning: true })
+        }
       } else if (event.type === 'tool.complete') {
         if (sessionId) {
           flushQueuedDeltas(sessionId)
           upsertToolCall(sessionId, toTodoPayload(payload) ?? payload, 'complete', event.type)
+
+          if (isActiveEvent) {
+            setPetActivity({ toolRunning: false })
+          }
+
           // A pending clarify blocks the turn, so the first tool.complete after
           // one is the clarify resolving — drop the "needs input" flag here so
           // the sidebar indicator clears as soon as it's answered, not only at
@@ -1087,6 +1111,11 @@ export function useMessageStream({
           clearAllPrompts(sessionId)
           setSessionCompacting(sessionId, false)
           compactedTurnRef.current.delete(sessionId)
+        }
+
+        if (isActiveEvent) {
+          setPetActivity({ reasoning: false, toolRunning: false })
+          flashPetActivity({ error: true })
         }
 
         dispatchNativeNotification({

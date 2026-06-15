@@ -15,7 +15,27 @@ mirror stay faithful without a second design.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Any
+
 from agent.pet.constants import PetState
+
+
+def todos_all_done(todos: Iterable[Any] | None) -> bool:
+    """True iff there's ≥1 todo and every one is completed/cancelled.
+
+    The "celebrate" beat (``JUMP``) fires when a plan finishes; this mirrors
+    the TUI's ``isTodoDone`` so the trigger is defined once across surfaces.
+    Accepts dicts (``{"status": ...}``) or objects with a ``status`` attr.
+    """
+    items = list(todos or [])
+    if not items:
+        return False
+
+    def _status(t: Any) -> Any:
+        return t.get("status") if isinstance(t, dict) else getattr(t, "status", None)
+
+    return all(_status(t) in ("completed", "cancelled") for t in items)
 
 
 def derive_pet_state(

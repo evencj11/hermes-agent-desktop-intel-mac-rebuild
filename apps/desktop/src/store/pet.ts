@@ -47,31 +47,49 @@ export function derivePetState(activity: PetActivity): PetState {
   if (activity.error) {
     return 'failed'
   }
+
   if (activity.celebrate) {
     return 'jump'
   }
+
   if (activity.justCompleted) {
     return 'wave'
   }
+
   if (activity.toolRunning) {
     return 'run'
   }
+
   if (activity.reasoning) {
     return 'review'
   }
+
   if (activity.busy) {
     return 'run'
   }
+
   return 'idle'
 }
 
 export const $petInfo = atom<PetInfo>({ enabled: false })
 export const $petActivity = atom<PetActivity>({})
 
-/** Transient flags the message stream can set without owning the full activity
- *  object. They decay back to false (handled by callers / timers). */
+/** Steady activity flags (toolRunning / reasoning) set + cleared by the stream. */
 export const setPetActivity = (next: Partial<PetActivity>) =>
   $petActivity.set({ ...$petActivity.get(), ...next })
+
+let flashTimer: ReturnType<typeof setTimeout> | undefined
+
+/** Fire a transient reaction beat (error / celebrate / justCompleted) that
+ *  decays back to the steady state after `ms`. */
+export const flashPetActivity = (next: Partial<PetActivity>, ms = 1600) => {
+  setPetActivity(next)
+  clearTimeout(flashTimer)
+  flashTimer = setTimeout(
+    () => setPetActivity({ celebrate: false, error: false, justCompleted: false }),
+    ms
+  )
+}
 
 export const setPetInfo = (info: PetInfo) => $petInfo.set(info)
 
@@ -83,14 +101,19 @@ export const setPetInfo = (info: PetInfo) => $petInfo.set(info)
  */
 export const $petState = computed(
   [$petActivity, $busy, $awaitingResponse],
-  (activity, busy, awaiting): PetState =>
-    derivePetState({
-      busy: activity.busy ?? busy,
+  (activity, busy, awaiting): PetState => {
+    const live = activity.busy ?? busy
+
+    return derivePetState({
+      busy: live,
       awaitingInput: activity.awaitingInput ?? awaiting,
-      toolRunning: activity.toolRunning,
-      reasoning: activity.reasoning,
+      // Steady flags only count mid-turn — ignore stale ones once at rest so an
+      // interrupted turn can't pin the pet on `run`/`review`.
+      toolRunning: live && activity.toolRunning,
+      reasoning: live && activity.reasoning,
       error: activity.error,
       justCompleted: activity.justCompleted,
       celebrate: activity.celebrate
     })
+  }
 )

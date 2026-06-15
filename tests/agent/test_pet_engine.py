@@ -40,6 +40,25 @@ def test_derive_priority_order():
     assert state.derive_pet_state(busy=True) is PetState.RUN
 
 
+def test_todos_all_done():
+    # empty / falsy → not done (no plan to celebrate)
+    assert state.todos_all_done(None) is False
+    assert state.todos_all_done([]) is False
+    # any open item → not done
+    assert state.todos_all_done([{"status": "completed"}, {"status": "pending"}]) is False
+    assert state.todos_all_done([{"status": "in_progress"}]) is False
+    # every item terminal → done (completed and/or cancelled)
+    assert state.todos_all_done([{"status": "completed"}, {"status": "cancelled"}]) is True
+
+    # objects with a .status attr work too (mirrors dict + attr access)
+    class _T:
+        def __init__(self, status):
+            self.status = status
+
+    assert state.todos_all_done([_T("completed")]) is True
+    assert state.todos_all_done([_T("completed"), _T("pending")]) is False
+
+
 def test_state_row_index_maps_to_taxonomy():
     # row index must equal position in STATE_ROWS for every driveable state
     for st in PetState:
