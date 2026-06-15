@@ -32,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # stable
+        uses: dtolnay/rust-toolchain@1.96.0 # stable
 
       - name: Cache Rust targets
         uses: Swatinem/rust-cache@c106961feec855ef5a58494c5a2a31c9d80429a9
@@ -187,9 +187,9 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $ffmpeg-pid = Get-Content ffmpeg.pid -ErrorAction SilentlyContinue
-          if ($ffmpeg-pid) {
-            Stop-Process -Id $ffmpeg-pid -ErrorAction SilentlyContinue
+          $ffmpegpid = Get-Content ffmpeg.pid -ErrorAction SilentlyContinue
+          if ($ffmpegpid) {
+            Stop-Process -Id $ffmpegpid -ErrorAction SilentlyContinue
             Start-Sleep -Seconds 2
           }
 
