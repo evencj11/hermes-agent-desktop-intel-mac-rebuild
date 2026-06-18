@@ -289,7 +289,7 @@ jobs:
           }
 
           # Build the timestamp overlay
-          $vf = "drawtext=text='%{pts\:hms}':fontfile='C:/Windows/Fonts/arial.ttf':fontsize=20:fontcolor=white:box=1:boxcolor=black@0.5:x=8:y=8"
+          $vf = "drawtext=text='%{pts\:hms}':fontfile='C\:\\Windows\\Fonts\\arial.ttf':fontsize=20:fontcolor=white:box=1:boxcolor=black@0.5:x=8:y=8"
 
           if ($x -ne $null -and $y -ne $null -and $w -ne $null -and $h -ne $null) {
             # Window border + 16px grid only over the window + axis labels every 64px
@@ -297,7 +297,7 @@ jobs:
 
             # Label the X and Y axes at 64px intervals
             $labelStep = 64
-            $txt = "fontfile='C:/Windows/Fonts/arial.ttf':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.6"
+            $txt = "fontfile='C\:\\Windows\\Fonts\\arial.ttf':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.6"
             $labels = @()
 
             for ($i = 0; $i * $labelStep -le $w; $i++) {
