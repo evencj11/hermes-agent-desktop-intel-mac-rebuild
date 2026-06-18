@@ -3,28 +3,38 @@
 
 logPath := A_Args.Length >= 1 ? A_Args[1] : "ahk.log"
 
-; enable click animation ;;;;;;;;;;;
-~LButton::{
-    MouseGetPos(&x, &y)
-
-    size := 40
+ClickWithMarker(x, y, button := "Left") {
+    ; Draw marker
+    size := 20
 
     g := Gui("-Caption +AlwaysOnTop +ToolWindow")
-    g.BackColor := "Yellow"
+    g.BackColor := "Red"
 
-    g.Show(Format("x{} y{} w{} h{} NoActivate"
+    g.Show(Format(
+        "x{} y{} w{} h{} NoActivate"
         , x - size//2
         , y - size//2
         , size
-        , size))
+        , size
+    ))
 
-    hOuter := DllCall("CreateEllipticRgn", "Int", 0, "Int", 0, "Int", size, "Int", size, "Ptr")
-    hInner := DllCall("CreateEllipticRgn", "Int", 5, "Int", 5, "Int", size-5, "Int", size-5, "Ptr")
+    hRegion := DllCall(
+        "CreateEllipticRgn"
+        , "Int", 0
+        , "Int", 0
+        , "Int", size
+        , "Int", size
+        , "Ptr"
+    )
 
-    DllCall("CombineRgn", "Ptr", hOuter, "Ptr", hOuter, "Ptr", hInner, "Int", 3)
-    DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hOuter, "Int", true)
+    DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hRegion, "Int", true)
 
-    SetTimer(() => g.Destroy(), -300)
+    ; Remove marker after 500ms
+    SetTimer(() => g.Destroy(), -500)
+
+    ; Perform click
+    Click(x, y, button)
+}
 }
 
 
@@ -46,9 +56,10 @@ Sleep(3000)
 ToolTip("Clicking install at ")
 
 ; click install
-clickX := x + (w / 2)
+clickX := x + 448
 clickY := y + 418
-Click(clickX, clickY)
+
+ClickWithMarker(x, y)
 
 Sleep(2000)
 ToolTip("Done")
