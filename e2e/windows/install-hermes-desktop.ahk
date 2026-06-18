@@ -2,26 +2,28 @@
 #SingleInstance Force
 
 ; enable click animation ;;;;;;;;;;;
-
-
-DllCall("SystemParametersInfo", "UInt", 0x101D, "UInt", 0, "UInt", 1, "UInt", 0) ;SPI_SETMOUSESONAR ON
-
-OnExit(ExitSub)
-ExitSub(*) {
-    DllCall("SystemParametersInfo", "UInt", 0x101D, "UInt", 0, "UInt", 0, "UInt", 0) ;SPI_SETMOUSESONAR OFF
-}
-
-
 ~LButton::{
-    Send("{Ctrl down}")
-    Send("{Ctrl up}")
-}
+    MouseGetPos(&x, &y)
 
-~LButton Up::{
-    Send("{Ctrl down}")
-    Send("{Ctrl up}")
+    size := 40
+
+    g := Gui("-Caption +AlwaysOnTop +ToolWindow")
+    g.BackColor := "Yellow"
+
+    g.Show(Format("x{} y{} w{} h{} NoActivate"
+        , x - size//2
+        , y - size//2
+        , size
+        , size))
+
+    hOuter := DllCall("CreateEllipticRgn", "Int", 0, "Int", 0, "Int", size, "Int", size, "Ptr")
+    hInner := DllCall("CreateEllipticRgn", "Int", 5, "Int", 5, "Int", size-5, "Int", size-5, "Ptr")
+
+    DllCall("CombineRgn", "Ptr", hOuter, "Ptr", hOuter, "Ptr", hInner, "Int", 3)
+    DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hOuter, "Int", true)
+
+    SetTimer(() => g.Destroy(), -300)
 }
-;;;;;;;;;;;
 
 
 
