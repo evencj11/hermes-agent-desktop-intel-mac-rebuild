@@ -387,7 +387,8 @@ function Install-Uv {
         # than a bare `powershell`, which isn't guaranteed to be on PATH under
         # PowerShell 7 / pwsh-only setups.
         $psHostExe = Get-PowerShellHostExe
-        & $psHostExe -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" 2>&1 | Out-Null
+        $uvInstallLog = & $psHostExe -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" 2>&1
+        $uvInstallExit = $LASTEXITCODE
         $ErrorActionPreference = $prevEAP
 
         if (Test-Path $managedUv) {
@@ -396,6 +397,9 @@ function Install-Uv {
             Write-Success "Managed uv installed ($version)"
             return $true
         }
+
+        Write-Warn "uv installer exited $uvInstallExit; output:"
+        Write-Host ($uvInstallLog | Out-String) -ForegroundColor DarkGray
 
         Write-Err "uv installed but not found at $managedUv"
         Write-Info "Install manually: https://docs.astral.sh/uv/getting-started/installation/"
