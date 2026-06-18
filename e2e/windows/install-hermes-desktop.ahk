@@ -4,6 +4,8 @@
 logPath := A_Args.Length >= 1 ? A_Args[1] : "ahk.log"
 
 ClickWithMarker(x, y, button := "Left") {
+    ToolTip(Format("Clicking at {1}, {2}", x, y))
+
     ; Draw marker
     size := 20
 
@@ -52,11 +54,9 @@ FileAppend(Format("Window found at x={1} y={2} w={3} h={4}`n", x, y, w, h), logP
 
 Sleep(3000)
 
-ToolTip("Clicking install at ")
-
 ; click install
-clickX := x + 448
-clickY := y + 418
+clickX := (x + 448)
+clickY := (y + 418)
 
 ClickWithMarker(x, y)
 
