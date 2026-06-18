@@ -297,7 +297,7 @@ jobs:
             $grid = "drawbox=x=$x`:y=$y`:w=$w`:h=$h`:color=red@0.9:t=2,split=2[box][win];[win]crop=$w`:$h`:$x`:$y,drawgrid=w=16:h=16:t=1:c=red@0.4[grid];[box][grid]overlay=$x`:$y"
 
             # Label the X and Y axes at 64px intervals
-            $labelStep = 64
+            $labelStep = 16
             $txt = "fontfile='C\:\\Windows\\Fonts\\arial.ttf':fontsize=14:fontcolor=white:box=1:boxcolor=black@0.6"
             $labels = @()
 
