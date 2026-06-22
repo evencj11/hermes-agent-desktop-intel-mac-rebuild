@@ -134,11 +134,22 @@ jobs:
           fi
 
           hdiutil verify "${dmgs[0]}"
-          shasum -a 256 "${dmgs[0]}" "${zips[0]}" > release/SHA256SUMS.txt
+
+          asset_version="${UPSTREAM_TAG//\//-}"
+          versioned_base="Hermes-${asset_version}-mac-x64"
+          versioned_dmg="release/${versioned_base}.dmg"
+          versioned_zip="release/${versioned_base}.zip"
+          mv "${dmgs[0]}" "$versioned_dmg"
+          mv "${zips[0]}" "$versioned_zip"
+
+          (
+            cd release
+            shasum -a 256 "$(basename "$versioned_dmg")" "$(basename "$versioned_zip")" > SHA256SUMS.txt
+          )
 
           {
-            echo "dmg=${dmgs[0]}"
-            echo "zip=${zips[0]}"
+            echo "dmg=$versioned_dmg"
+            echo "zip=$versioned_zip"
             echo "checksums=release/SHA256SUMS.txt"
             echo "upstream_sha=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
@@ -187,4 +198,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Hermes Desktop for Intel macOS - $UPSTREAM_TAG (Unofficial)" \
             --notes-file "$notes_file" \
-            --prerelease
+            --latest
