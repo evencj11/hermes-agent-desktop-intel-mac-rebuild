@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "17 */6 * * *"
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Replace the latest Intel rebuild release even if it already exists"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -21,6 +26,8 @@ jobs:
       upstream_tag: ${{ steps.release.outputs.upstream_tag }}
       upstream_url: ${{ steps.release.outputs.upstream_url }}
       release_tag: ${{ steps.release.outputs.release_tag }}
+      release_exists: ${{ steps.release.outputs.release_exists }}
+      force_rebuild: ${{ steps.release.outputs.force_rebuild }}
     steps:
       - name: Discover release and skip existing rebuilds
         id: release
@@ -33,6 +40,7 @@ jobs:
           upstream_tag="$(jq -r '.tag_name' <<<"$upstream_json")"
           upstream_url="$(jq -r '.html_url' <<<"$upstream_json")"
           release_tag="intel-macos-${upstream_tag//\//-}"
+          force_rebuild="${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild }}"
 
           if [[ -z "$upstream_tag" || "$upstream_tag" == "null" ]]; then
             echo "The upstream latest stable release has no tag." >&2
@@ -43,12 +51,20 @@ jobs:
             echo "upstream_tag=$upstream_tag"
             echo "upstream_url=$upstream_url"
             echo "release_tag=$release_tag"
+            echo "force_rebuild=$force_rebuild"
           } >> "$GITHUB_OUTPUT"
 
           if gh release view "$release_tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "should_build=false" >> "$GITHUB_OUTPUT"
-            echo "Release $release_tag already exists; nothing to build."
+            echo "release_exists=true" >> "$GITHUB_OUTPUT"
+            if [[ "$force_rebuild" == "true" ]]; then
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+              echo "Release $release_tag already exists; force rebuild requested."
+            else
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              echo "Release $release_tag already exists; nothing to build."
+            fi
           else
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
             echo "should_build=true" >> "$GITHUB_OUTPUT"
             echo "New upstream stable release detected: $upstream_tag"
           fi
@@ -63,6 +79,8 @@ jobs:
       RELEASE_TAG: ${{ needs.discover.outputs.release_tag }}
       UPSTREAM_TAG: ${{ needs.discover.outputs.upstream_tag }}
       UPSTREAM_URL: ${{ needs.discover.outputs.upstream_url }}
+      FORCE_REBUILD: ${{ needs.discover.outputs.force_rebuild }}
+      RELEASE_EXISTS: ${{ needs.discover.outputs.release_exists }}
     steps:
       - name: Check out exact upstream release
         uses: actions/checkout@v4
@@ -84,7 +102,15 @@ jobs:
         working-directory: apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run dist:mac -- --x64 --publish never
+        run: |
+          set -euo pipefail
+          echo "Building upstream commit $(git rev-parse HEAD)"
+
+          # Hermes' build stamp script prefers GITHUB_SHA when it is present.
+          # In this repository that value points at the rebuild workflow commit,
+          # not the checked-out NousResearch/hermes-agent release. Remove it
+          # for the build child process so the stamp pins the upstream checkout.
+          env -u GITHUB_SHA -u GITHUB_REF_NAME npm run dist:mac -- --x64 --publish never
 
       - name: Validate x86_64 packages and write checksums
         id: validate
@@ -92,6 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
+          upstream_sha="$(git rev-parse HEAD)"
 
           app_binary="$(find release -path '*/Hermes.app/Contents/MacOS/Hermes' -type f -print -quit)"
           if [[ -z "$app_binary" ]]; then
@@ -124,6 +151,19 @@ jobs:
             exit 1
           fi
 
+          stamp_file="$(find release -path '*/Hermes.app/Contents/Resources/install-stamp.json' -type f -print -quit)"
+          if [[ -z "$stamp_file" ]]; then
+            echo "Packaged install-stamp.json was not found." >&2
+            exit 1
+          fi
+          stamp_commit="$(jq -r '.commit' "$stamp_file")"
+          stamp_source="$(jq -r '.source' "$stamp_file")"
+          echo "install-stamp.json commit=$stamp_commit source=$stamp_source"
+          if [[ "$stamp_commit" != "$upstream_sha" ]]; then
+            echo "install-stamp.json points at $stamp_commit, expected upstream checkout $upstream_sha." >&2
+            exit 1
+          fi
+
           dmgs=(release/*-mac-x64.dmg)
           zips=(release/*-mac-x64.zip)
           if (( ${#dmgs[@]} != 1 || ${#zips[@]} != 1 )); then
@@ -151,7 +191,7 @@ jobs:
             echo "dmg=$versioned_dmg"
             echo "zip=$versioned_zip"
             echo "checksums=release/SHA256SUMS.txt"
-            echo "upstream_sha=$(git rev-parse HEAD)"
+            echo "upstream_sha=$upstream_sha"
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish unofficial prerelease
@@ -164,6 +204,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+
+          if [[ "$FORCE_REBUILD" == "true" && "$RELEASE_EXISTS" == "true" ]]; then
+            gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          fi
 
           notes_file="$RUNNER_TEMP/intel-macos-release-notes.md"
           {
