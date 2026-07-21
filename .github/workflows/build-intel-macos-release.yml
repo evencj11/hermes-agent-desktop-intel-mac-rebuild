@@ -209,6 +209,23 @@ jobs:
             gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
           fi
 
+          tag_object_sha="$(
+            gh api \
+              --method POST \
+              "repos/$GITHUB_REPOSITORY/git/tags" \
+              -f tag="$RELEASE_TAG" \
+              -f message="Intel macOS rebuild for $UPSTREAM_TAG" \
+              -f object="$GITHUB_SHA" \
+              -f type="commit" \
+              --jq '.sha'
+          )"
+          gh api \
+            --method POST \
+            "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$RELEASE_TAG" \
+            -f sha="$tag_object_sha" \
+            >/dev/null
+
           notes_file="$RUNNER_TEMP/intel-macos-release-notes.md"
           {
             printf '# Unofficial Intel macOS rebuild\n\n'
@@ -239,7 +256,6 @@ jobs:
             "$ZIP_PATH" \
             "$CHECKSUM_PATH" \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
             --title "Hermes Desktop for Intel macOS - $UPSTREAM_TAG (Unofficial)" \
             --notes-file "$notes_file" \
             --latest
