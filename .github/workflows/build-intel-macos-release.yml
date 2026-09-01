@@ -83,14 +83,14 @@ jobs:
       RELEASE_EXISTS: ${{ needs.discover.outputs.release_exists }}
     steps:
       - name: Check out exact upstream release
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: NousResearch/hermes-agent
           ref: ${{ needs.discover.outputs.upstream_tag }}
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # Hermes v2026.8.3 requires npm <11.10.0 or >=11.17.0. Pin the
           # first Node 24 release that bundles a compatible npm version so
@@ -113,7 +113,11 @@ jobs:
           # In this repository that value points at the rebuild workflow commit,
           # not the checked-out NousResearch/hermes-agent release. Remove it
           # for the build child process so the stamp pins the upstream checkout.
-          env -u GITHUB_SHA -u GITHUB_REF_NAME npm run dist:mac -- --x64 --publish never
+          # Since v2026.8.31, upstream's run-electron-builder.mjs injects
+          # "--publish never" itself. Passing it a second time makes yargs
+          # produce an array, so electron-builder no longer recognizes the
+          # value as "never" and incorrectly enters the GitHub publish path.
+          env -u GITHUB_SHA -u GITHUB_REF_NAME npm run dist:mac -- --x64
 
       - name: Validate x86_64 packages and write checksums
         id: validate
