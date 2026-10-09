@@ -118,6 +118,26 @@ jobs:
           print('Patched native dependency and packager outputs into build/products')
           PY
 
+      - name: Set up Python for packaging helpers
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Select prepared build interpreter
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'HERMES_PYTHON={sys.executable}\n')
+          sys.path.insert(0, str(Path.cwd()))
+          import pm
+          assert pm.current_target() == 'darwin-x64'
+          print(f'Packaging Python: {sys.executable}; target: {pm.current_target()}')
+          PY
+
       - name: Install locked dependencies
         run: npm ci
 
