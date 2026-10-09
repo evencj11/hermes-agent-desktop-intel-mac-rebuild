@@ -98,6 +98,26 @@ jobs:
           node-version: 24.19.0
           cache: npm
 
+      - name: Fix upstream v0.21.6 packaging output paths
+        if: needs.discover.outputs.upstream_tag == 'v0.21.6'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script = Path('apps/desktop/scripts/run-electron-builder.mjs')
+          text = script.read_text()
+          replacements = {
+              "path.join(app, 'build/packager', target)": "path.join(app, 'build/products/packager', target)",
+              '`build/native-deps-${target}`': '`build/products/native-deps-${target}`',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'Unexpected upstream packaging script: {old!r}')
+              text = text.replace(old, new)
+          script.write_text(text)
+          print('Patched native dependency and packager outputs into build/products')
+          PY
+
       - name: Install locked dependencies
         run: npm ci
 
