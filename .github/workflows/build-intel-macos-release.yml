@@ -98,8 +98,7 @@ jobs:
           node-version: 24.19.0
           cache: npm
 
-      - name: Fix upstream v0.21.6 packaging output paths
-        if: needs.discover.outputs.upstream_tag == 'v0.21.6'
+      - name: Keep packaging outputs in upstream's generated-product directory
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -110,12 +109,22 @@ jobs:
               "path.join(app, 'build/packager', target)": "path.join(app, 'build/products/packager', target)",
               '`build/native-deps-${target}`': '`build/products/native-deps-${target}`',
           }
+          changed = False
           for old, new in replacements.items():
-              if text.count(old) != 1:
-                  raise SystemExit(f'Unexpected upstream packaging script: {old!r}')
-              text = text.replace(old, new)
-          script.write_text(text)
-          print('Patched native dependency and packager outputs into build/products')
+              old_count = text.count(old)
+              new_count = text.count(new)
+              if old_count == 1:
+                  text = text.replace(old, new)
+                  changed = True
+              elif old_count > 1:
+                  raise SystemExit(f'Unexpected duplicate upstream packaging path: {old!r}')
+              elif new_count == 0:
+                  print(f'Packaging path is no longer present upstream: {old!r}')
+          if changed:
+              script.write_text(text)
+              print('Patched native dependency and packager outputs into build/products')
+          else:
+              print('Upstream packaging outputs already use supported destinations')
           PY
 
       - name: Set up Python for packaging helpers
