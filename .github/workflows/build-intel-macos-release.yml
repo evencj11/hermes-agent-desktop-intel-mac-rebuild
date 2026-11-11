@@ -146,7 +146,12 @@ jobs:
           PY
 
       - name: Install pnpm
-        run: npm install --global "pnpm@$(node -p \"require('./pm/lock.json').packages.pnpm.version\")"
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./pm/lock.json').packages.pnpm.version")"
+          test -n "$version"
+          npm install --global "pnpm@$version"
+          test "$(pnpm --version)" = "$version"
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
