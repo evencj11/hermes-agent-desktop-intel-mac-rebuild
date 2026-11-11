@@ -94,7 +94,7 @@ jobs:
         with:
           # Use the Node version specified by the checked-out upstream release.
           node-version-file: .nvmrc
-          cache: npm
+          package-manager-cache: false
 
       - name: Keep packaging outputs in upstream's generated-product directory
         run: |
@@ -145,8 +145,11 @@ jobs:
           print(f'Packaging Python: {sys.executable}; target: {pm.current_target()}')
           PY
 
+      - name: Install pnpm
+        run: npm install --global pnpm@12
+
       - name: Install locked dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build unsigned Intel macOS packages
         working-directory: apps/desktop
@@ -164,7 +167,7 @@ jobs:
           # "--publish never" itself. Passing it a second time makes yargs
           # produce an array, so electron-builder no longer recognizes the
           # value as "never" and incorrectly enters the GitHub publish path.
-          env -u GITHUB_SHA -u GITHUB_REF_NAME npm run dist:mac -- --x64
+          env -u GITHUB_SHA -u GITHUB_REF_NAME pnpm run dist:mac --x64
 
       - name: Validate x86_64 packages and write checksums
         id: validate
