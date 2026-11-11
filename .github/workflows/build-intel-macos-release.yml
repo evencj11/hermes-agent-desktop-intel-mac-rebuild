@@ -146,7 +146,7 @@ jobs:
           PY
 
       - name: Install pnpm
-        run: npm install --global pnpm@12
+        run: npm install --global "pnpm@$(node -p \"require('./pm/lock.json').packages.pnpm.version\")"
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
